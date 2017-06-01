@@ -1,7 +1,7 @@
 'use strict';
 
 var CaptureSession = require('lib/capture-session'),
-    CaptureProcessor = require('lib/state-processor/capture-processor/capture-processor'),
+    CaptureProcessor = require('lib/state-processor/capture-processor'),
     temp = require('lib/temp'),
     proxyquire = require('proxyquire').noCallThru(),
     Promise = require('bluebird'),
@@ -12,6 +12,19 @@ describe('state-processor/job', () => {
         CaptureProcessorStub,
         captureProcessor,
         browserSession;
+
+    function execJob_(opts) {
+        opts = _.defaults(opts || {}, {
+            captureProcessorInfo: {
+                module: '/path/to/some/module'
+            }
+        });
+
+        var stubs = _.set({}, opts.captureProcessorInfo.module, CaptureProcessorStub),
+            job = proxyquire('lib/state-processor/job', stubs);
+
+        return job(opts, _.noop);
+    }
 
     beforeEach(() => {
         captureProcessor = sinon.createStubInstance(CaptureProcessor);
@@ -29,22 +42,7 @@ describe('state-processor/job', () => {
         sandbox.stub(temp);
     });
 
-    afterEach(() => {
-        sandbox.restore();
-    });
-
-    function execJob_(opts) {
-        opts = _.defaults(opts || {}, {
-            captureProcessorInfo: {
-                module: '/path/to/some/module'
-            }
-        });
-
-        var stubs = _.set({}, opts.captureProcessorInfo.module, CaptureProcessorStub),
-            job = proxyquire('lib/state-processor/job', stubs);
-
-        return job(opts, _.noop);
-    }
+    afterEach(() => sandbox.restore());
 
     it('should create capture processor', () => {
         execJob_({
@@ -54,20 +52,14 @@ describe('state-processor/job', () => {
             }
         });
 
-        assert.calledOnce(CaptureProcessorStub.create);
-        assert.calledWith(CaptureProcessorStub.create, 'some-arg');
+        assert.calledOnceWith(CaptureProcessorStub.create, 'some-arg');
     });
 
     it('should capture screenshot', () => {
-        var page = {
-            captureArea: {}
-        };
+        var page = {captureArea: {}};
 
         return execJob_({page})
-            .then(() => {
-                assert.calledOnce(browserSession.capture);
-                assert.calledWith(browserSession.capture, page);
-            });
+            .then(() => assert.calledOnceWith(browserSession.capture, page));
     });
 
     it('should process captured screenshot', () => {
@@ -75,9 +67,6 @@ describe('state-processor/job', () => {
         browserSession.capture.returns(Promise.resolve(capture));
 
         return execJob_()
-            .then(() => {
-                assert.calledOnce(captureProcessor.exec);
-                assert.calledWith(captureProcessor.exec, capture);
-            });
+            .then(() => assert.calledOnceWith(captureProcessor.exec, capture));
     });
 });

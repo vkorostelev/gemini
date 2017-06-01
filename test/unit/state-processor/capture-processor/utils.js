@@ -5,88 +5,106 @@ const fs = require('fs-extra');
 const Promise = require('bluebird');
 
 const Image = require('lib/image');
-const NoRefImageError = require('lib/errors/no-ref-image-error');
 const utils = require('lib/state-processor/capture-processor/utils');
 
 describe('state-processor/capture-processor/utils', () => {
     const sandbox = sinon.sandbox.create();
 
-    beforeEach(() => {
-        sandbox.stub(fs);
-    });
-
     afterEach(() => sandbox.restore());
 
-    describe('compareImgs', () => {
-        it('should pass through all arguments to image comparator', () => {
-            sandbox.stub(Image, 'compare').returns(Promise.resolve());
-
-            return utils.compareImgs('/temp/path', '/ref/path', {canHaveCaret: true})
-                .then(() => assert.calledWith(Image.compare, '/temp/path', '/ref/path', {canHaveCaret: true}));
-        });
-    });
-
     describe('copyImg', () => {
-        it('should copy current image to reference path', () => {
-            fs.copyAsync.returns(Promise.resolve());
+        beforeEach(() => sandbox.stub(fs, 'copyAsync').returns(Promise.resolve()));
 
+        it('should copy a current image to reference path', () => {
             return utils.copyImg('/temp/path', '/ref/path')
-                .then((res) => {
-                    assert.calledWith(fs.copyAsync, '/temp/path', '/ref/path');
-                    assert.isTrue(res);
-                });
+                .then(() => assert.calledOnceWith(fs.copyAsync, '/temp/path', '/ref/path'));
+        });
+
+        describe('should return', () => {
+            it('"true" if a current image is copied successfully', () => {
+                return utils.copyImg('/temp/path', '/ref/path')
+                    .then((res) => assert.isTrue(res));
+            });
+
+            it('"false" if a current image was not copied', () => {
+                fs.copyAsync.returns(Promise.reject());
+
+                return utils.copyImg('/temp/path', '/ref/path')
+                    .then((res) => assert.isFalse(res));
+            });
         });
     });
 
     describe('saveRef', () => {
-        let imageStub;
-
         const save_ = (opts) => {
             opts = _.defaults(opts || {}, {
-                refPath: '/non/relevant.png'
+                refPath: '/default/path'
             });
 
-            let capture = {image: imageStub};
-
-            return utils.saveRef(opts.refPath, capture);
+            return utils.saveRef(opts.refPath, _.set({}, 'image.save', Image.prototype.save));
         };
 
         beforeEach(() => {
-            imageStub = sinon.createStubInstance(Image);
-            imageStub.save.returns(Promise.resolve());
+            sandbox.stub(fs, 'mkdirsAsync').returns(Promise.resolve());
+            sandbox.stub(Image.prototype, 'save').returns(Promise.resolve());
         });
 
-        it('should make directory before saving the image', () => {
+        it('should make a directory before saving the image', () => {
             const mediator = sinon.spy().named('mediator');
 
-            fs.mkdirsAsync.returns(Promise.delay(50).then(mediator));
+            fs.mkdirsAsync.callsFake(() => Promise.delay(1).then(mediator));
 
             return save_()
-                .then(() => assert.callOrder(fs.mkdirsAsync, mediator, imageStub.save));
+                .then(() => assert.callOrder(fs.mkdirsAsync, mediator, Image.prototype.save));
         });
 
-        it('should save image with given path', () => {
-            fs.mkdirsAsync.returns(Promise.resolve());
-
+        it('should save an image with the given path', () => {
             return save_({refPath: '/ref/path'})
-                .then((res) => {
-                    assert.calledWith(imageStub.save, '/ref/path');
-                    assert.isTrue(res);
-                });
+                .then(() => assert.calledOnceWith(Image.prototype.save, '/ref/path'));
+        });
+
+        describe('should return', () => {
+            it('"true" if the directory is created and the image saved successfully', () => {
+                return save_({refPath: '/ref/path'})
+                    .then((res) => assert.isTrue(res));
+            });
+
+            it('"false" if the directory was not created', () => {
+                fs.mkdirsAsync.returns(Promise.reject());
+
+                return save_({refPath: '/ref/path'})
+                    .then((res) => assert.isFalse(res));
+            });
+
+            it('"false" if the image was not saved', () => {
+                Image.prototype.save.returns(Promise.reject());
+
+                return save_({refPath: '/ref/path'})
+                    .then((res) => assert.isFalse(res));
+            });
         });
     });
 
     describe('existsRef', () => {
-        it('should fulfill promise if reference image exists', () => {
-            fs.accessAsync.returns(Promise.resolve());
+        beforeEach(() => sandbox.stub(fs, 'accessAsync').returns(Promise.resolve()));
 
-            return assert.isFulfilled(utils.existsRef('/existent/path'));
+        it('should check the reference image existence', () => {
+            return utils.existsRef('/ref/path')
+                .then(() => assert.calledOnceWith(fs.accessAsync, '/ref/path'));
         });
 
-        it('should reject with error if reference image does not exist', () => {
-            fs.accessAsync.returns(Promise.reject());
+        describe('should return', () => {
+            it('"true" if the reference image exists', () => {
+                return utils.existsRef('/ref/path')
+                    .then((res) => assert.isTrue(res));
+            });
 
-            return assert.isRejected(utils.existsRef('/non-existent/path'), NoRefImageError);
+            it('"false" if the reference image does not exists', () => {
+                fs.accessAsync.returns(Promise.reject());
+
+                return utils.existsRef('/ref/path')
+                    .then((res) => assert.isFalse(res));
+            });
         });
     });
 });

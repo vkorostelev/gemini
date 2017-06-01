@@ -1,7 +1,6 @@
 'use strict';
 
 var CaptureSession = require('lib/capture-session'),
-    CaptureProcessor = require('lib/state-processor/capture-processor/capture-processor'),
     temp = require('lib/temp'),
     util = require('../../util'),
     errorUtils = require('lib/errors/utils'),
@@ -12,8 +11,7 @@ var CaptureSession = require('lib/capture-session'),
 
 describe('state-processor/state-processor', () => {
     var sandbox = sinon.sandbox.create(),
-        job = sinon.stub(),
-        captureProcessor;
+        job = sinon.stub();
 
     beforeEach(() => {
         sandbox.stub(temp);
@@ -28,15 +26,6 @@ describe('state-processor/state-processor', () => {
     describe('exec', () => {
         var browserSession;
 
-        beforeEach(() => {
-            browserSession = sinon.createStubInstance(CaptureSession);
-            _.set(browserSession, 'browser.config', {
-                getScreenshotPath: sinon.stub()
-            });
-
-            captureProcessor = sinon.createStubInstance(CaptureProcessor);
-        });
-
         function exec_(opts) {
             opts = _.defaultsDeep(opts || {}, {
                 captureProcessorInfo: {
@@ -46,19 +35,24 @@ describe('state-processor/state-processor', () => {
                 page: {}
             });
 
-            var stubs = {
-                'worker-farm': () => {
-                    return (args, cb) => cb(null, job(args));
-                }
-            };
-            stubs[opts.captureProcessorInfo.module] = {create: () => captureProcessor};
-
-            var StateProcessor = proxyquire('lib/state-processor/state-processor', stubs),
+            var StateProcessor = proxyquire('lib/state-processor/state-processor',
+                {
+                    'worker-farm': () => {
+                        return (args, cb) => cb(null, job(args));
+                    }
+                }),
                 stateProcessor = new StateProcessor(opts.captureProcessorInfo);
 
             stateProcessor.prepare(new QEmitter());
             return stateProcessor.exec(opts.state, browserSession, opts.page);
         }
+
+        beforeEach(() => {
+            browserSession = sinon.createStubInstance(CaptureSession);
+            _.set(browserSession, 'browser.config', {
+                getScreenshotPath: sinon.stub()
+            });
+        });
 
         it('should perform job', () => {
             return exec_()
@@ -85,24 +79,19 @@ describe('state-processor/state-processor', () => {
         });
 
         it('should pass page disposition to job', () => {
-            return exec_({
-                page: {some: 'data'}
-            })
+            return exec_(_.set({}, 'page.some', 'data'))
                 .then(() => assert.calledWithMatch(job, {
                     page: {some: 'data'}
                 }));
         });
 
         it('should not pass coverage data to job', () => {
-            return exec_({
-                page: {
-                    coverage: 'some-big-object'
-                }
-            }).then(() => assert.neverCalledWithMatch(job, {
-                page: {
-                    coverage: 'some-big-object'
-                }
-            }));
+            return exec_(_.set({}, 'page.coverage', 'some-big-object'))
+                .then(() => assert.neverCalledWithMatch(job, {
+                    page: {
+                        coverage: 'some-big-object'
+                    }
+                }));
         });
 
         it('should pass serialized temp to job', () => {
@@ -120,10 +109,10 @@ describe('state-processor/state-processor', () => {
             browserSession.browser.config.getScreenshotPath.returns('/some/path');
             browserSession.browser.config.tolerance = 100500;
 
-            return exec_({state: state})
+            return exec_({state})
                 .then(() => assert.calledWithMatch(job, {
                     execOpts: {
-                        refPath: '/some/path',
+                        referencePath: '/some/path',
                         tolerance: 100500
                     }
                 }));
@@ -135,7 +124,7 @@ describe('state-processor/state-processor', () => {
 
             browserSession.browser.config.tolerance = 100500;
 
-            return exec_({state: state})
+            return exec_({state})
                 .then(() => assert.calledWithMatch(job, {
                     execOpts: {
                         tolerance: 1
@@ -149,7 +138,7 @@ describe('state-processor/state-processor', () => {
 
             browserSession.browser.config.tolerance = 100500;
 
-            return exec_({state: state})
+            return exec_({state})
                 .then(() => assert.calledWithMatch(job, {
                     execOpts: {
                         tolerance: 0
@@ -158,11 +147,7 @@ describe('state-processor/state-processor', () => {
         });
 
         it('should use page pixel ratio', () => {
-            const opts = {
-                page: {
-                    pixelRatio: 11
-                }
-            };
+            const opts = _.set({}, 'page.pixelRatio', 11);
 
             return exec_(opts)
                 .then(() => assert.calledWithMatch(job, {
