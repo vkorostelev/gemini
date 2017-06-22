@@ -29,6 +29,7 @@ describe('state-processor/capture-processor', () => {
             return processor.exec(capture, opts);
         };
     };
+
     let exec_;
 
     beforeEach(() => {
@@ -76,16 +77,16 @@ describe('state-processor/capture-processor', () => {
 
             const opts = {
                 referencePath: '/ref/path',
-                pixelRatio: 2.0,
-                tolerance: 3.0
+                pixelRatio: 100500,
+                tolerance: 200500
             };
 
             return exec_(opts, {canHaveCaret: false})
                 .then(() => {
                     assert.calledOnceWith(Image.compare, '/temp/path', '/ref/path', {
                         canHaveCaret: false,
-                        pixelRatio: 2.0,
-                        tolerance: 3.0
+                        pixelRatio: 100500,
+                        tolerance: 200500
                     });
                 });
         });
@@ -114,8 +115,8 @@ describe('state-processor/capture-processor', () => {
             return assert.isRejected(exec_({refPath: '/non-existent/path'}), NoRefImageError);
         });
 
-        describe('should return image comparison result', () => {
-            it('if images are equal', () => {
+        describe('should return image comparison result if images are', () => {
+            it('equal', () => {
                 temp.path.withArgs({suffix: '.png'}).returns('/temp/path');
 
                 return exec_({referencePath: '/ref/path'})
@@ -128,7 +129,7 @@ describe('state-processor/capture-processor', () => {
                     });
             });
 
-            it('if images are different', () => {
+            it('different', () => {
                 Image.compare.resolves(false);
                 temp.path.withArgs({suffix: '.png'}).returns('/temp/path');
 
