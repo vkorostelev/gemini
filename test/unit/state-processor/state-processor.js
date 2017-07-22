@@ -28,9 +28,7 @@ describe('state-processor/state-processor', () => {
 
         function exec_(opts) {
             opts = _.defaultsDeep(opts || {}, {
-                captureProcessorInfo: {
-                    module: '/some/default/module'
-                },
+                captureProcessorType: 'default-type',
                 state: util.makeStateStub(),
                 page: {}
             });
@@ -41,7 +39,7 @@ describe('state-processor/state-processor', () => {
                         return (args, cb) => cb(null, job(args));
                     }
                 }),
-                stateProcessor = new StateProcessor(opts.captureProcessorInfo);
+                stateProcessor = new StateProcessor(opts.captureProcessorType);
 
             stateProcessor.prepare(new QEmitter());
             return stateProcessor.exec(opts.state, browserSession, opts.page);
@@ -68,14 +66,11 @@ describe('state-processor/state-processor', () => {
                 }));
         });
 
-        it('should pass capture processor info to job', () => {
-            var captureProcessorInfo = {
-                module: '/some/module',
-                constructorArg: {some: 'arg'}
-            };
+        it('should pass capture processor type to job', () => {
+            var captureProcessorType = 'some-type';
 
-            return exec_({captureProcessorInfo})
-                .then(() => assert.calledWithMatch(job, {captureProcessorInfo}));
+            return exec_({captureProcessorType})
+                .then(() => assert.calledWithMatch(job, {captureProcessorType}));
         });
 
         it('should pass page disposition to job', () => {

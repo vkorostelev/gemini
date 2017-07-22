@@ -7,10 +7,10 @@ const Image = require('lib/image');
 const temp = require('lib/temp');
 const utils = require('lib/state-processor/capture-processor/utils');
 const NoRefImageError = require('lib/errors/no-ref-image-error');
-const CaptureProcessor = require('lib/state-processor/capture-processor');
-const CaptureProcessorFactory = require('lib/state-processor/capture-processor/factory');
+const CaptureProcessor = require('lib/state-processor/capture-processor/capture-processor');
+const CaptureProcessorFactory = require('lib/state-processor/capture-processor');
 
-describe('state-processor/capture-processor', () => {
+describe('state-processor/capture-processor/capture-processor', () => {
     const sandbox = sinon.sandbox.create();
 
     const mkExecMethod = (processor) => {
